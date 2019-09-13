@@ -1,4 +1,4 @@
-# Automaic code generator for Tiramisu
+# Automatic code generator for Tiramisu
 
 Generates random Tiramisu codes. The program currently generates two types of codes :
 * Sequence of computations which can be : simple assignments, assignments with other computations or stencils.
