@@ -71,8 +71,14 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                                                   int nb_rand_schedules, vector<dim_stats *> *stats);
 
 node_class *comp_to_node(computation *comp, int seed);
+node_class *comps_to_node(vector<computation*> comp, int seed);
+
 void generate_all_schedules(vector<schedule_params> schedules, computation *comp, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes);
+void generate_all_schedules_multiple_adj_comps(vector<schedule_params> schedules, vector<computation*> comps, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes);
+
 void generate_random_schedules(int nb_schedules, vector<schedule_params> schedules, computation *comp, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes);
+void generate_random_schedules_multiple_adj_comps(int nb_schedules, vector<schedule_params> schedules, vector<computation*> comps, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes);
+
 schedules_class *confs_to_sc(vector<configuration> schedules);
 string to_base_2(int num, int nb_pos);
 

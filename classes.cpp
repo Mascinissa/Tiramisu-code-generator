@@ -2,6 +2,8 @@
 #include <sys/stat.h>
 #include "classes.h"
 #include "external_writers.h"
+#include <algorithm>
+#include <string>
 
 stats_per_type::stats_per_type() {
     nb_assignments = 0;
@@ -164,51 +166,61 @@ schedule::schedule(vector<computation *> comps, int type, vector<int> factors, v
 
 }
 
-void schedule::write(string *code_buffer) {
-    switch (type) {
-        case INTERCHANGE:
-            *code_buffer += comps[0]->name + ".interchange(" + this->vars_to_string(0, this->vars.size()) + ");";
-            break;
-        case UNROLL:
-            *code_buffer += comps[0]->name + ".unroll(" + vars[0]->name + ", " + to_string(factors[0]) + ");";
-            break;
-        case TILE_2:
-            *code_buffer +=
-                    comps[0]->name + ".tile(" + this->vars_to_string(0, 2) + ", " + to_string(factors[0]) + ", " +
-                    to_string(factors[1]) + ", " + this->vars_to_string(2, this->vars.size()) + ");";
-            break;
-        case TILE_3:
-            *code_buffer +=
-                    comps[0]->name + ".tile(" + this->vars_to_string(0, 3) + ", " + to_string(factors[0]) + ", " +
-                    to_string(factors[1]) + ", " + to_string(factors[2]) + ", " +
-                    this->vars_to_string(3, this->vars.size()) + ");";
-            break;
-        case THEN:
-            if (comps.size() > 1) {
-                *code_buffer += comps[0]->name;
-                for (int i = 1; i < comps.size(); ++i) {
-                    *code_buffer += ".then(" + comps[i]->name + ", computation::rootroot)";
+void schedule::write(string *code_buffer, int indentation_level) {
+    for (int k=0; k<comps.size(); k++) {
+        switch (type) {
+            case INTERCHANGE:
+                *code_buffer += comps[k]->name + ".interchange(" + this->vars_to_string(0, this->vars.size()) + ");";
+                break;
+            case UNROLL:
+                *code_buffer += comps[k]->name + ".unroll(" + vars[0]->name + ", " + to_string(factors[0]) + ");";
+                break;
+            case TILE_2:
+                *code_buffer +=
+                        comps[k]->name + ".tile(" + this->vars_to_string(0, 2) + ", " + to_string(factors[0]) + ", " +
+                        to_string(factors[1]) + ", " + this->vars_to_string(2, this->vars.size()) + ");";
+                break;
+            case TILE_3:
+                *code_buffer +=
+                        comps[k]->name + ".tile(" + this->vars_to_string(0, 3) + ", " + to_string(factors[0]) + ", " +
+                        to_string(factors[1]) + ", " + to_string(factors[2]) + ", " +
+                        this->vars_to_string(3, this->vars.size()) + ");";
+                break;
+            case THEN:
+                if (comps.size() > 1) {
+                    *code_buffer += comps[k]->name;
+                    for (int i = 1; i < comps.size(); ++i) {
+                        *code_buffer += ".then(" + comps[i]->name + ", computation::rootroot)";
+                    }
+                    *code_buffer += ";";
                 }
-                *code_buffer += ";";
-            }
-            break;
-        case VECTORIZE:
-            *code_buffer +=
-                    comps[0]->name + ".vectorize(" + this->vars_to_string(0, 1) + ", " + to_string(factors[0]) + ", " +
-                    this->vars_to_string(1, this->vars.size()) + ");";
-            break;
-        case PARALLELIZE:
-            *code_buffer += comps[0]->name + ".parallelize(" + this->vars_to_string(0, 1) + ");";
-            break;
+                break;
+            case VECTORIZE:
+                *code_buffer +=
+                        comps[k]->name + ".vectorize(" + this->vars_to_string(0, 1) + ", " + to_string(factors[0]) +
+                        ", " +
+                        this->vars_to_string(1, this->vars.size()) + ");";
+                break;
+            case PARALLELIZE:
+                *code_buffer += comps[k]->name + ".parallelize(" + this->vars_to_string(0, 1) + ");";
+                break;
 
-        case AFTER:
-            if (comps.size() > 1) {
-                *code_buffer += comps[0]->name;
-                for (int i = 1; i < comps.size(); ++i) {
-                    *code_buffer += ".after(" + comps[i]->name + ", " + to_string(this->factors[i - 1]) + ")";
+            case AFTER:
+                if (comps.size() > 1) {
+                    *code_buffer += comps[k]->name;
+                    for (int i = 1; i < comps.size(); ++i) {
+                        *code_buffer += ".after(" + comps[i]->name + ", " + to_string(this->factors[i - 1]) + ")";
+                    }
+                    *code_buffer += ";";
                 }
-                *code_buffer += ";";
+
+        }
+        if (k<comps.size()-1){
+            *code_buffer += "\n";
+            for (int i = 0; i < indentation_level; ++i) {
+                *code_buffer += "    ";
             }
+        }
 
     }
 
@@ -256,11 +268,13 @@ string computation_abstract::vars_to_string() {
 vector<string>
 computation_abstract::for_stencils(vector<int> var_nums, int offset, vector<vector<vector<int>>> *accesses) {
     vector<string> strings;
-    strings.push_back(vars_to_string());
+    //strings.push_back(vars_to_string());
     string s;
     string zeros;
     string vars;
     int pos;
+    vector<vector <long>> accesses_updates;
+    vector<int> to_erase;
     for (int i = 1; i < pow(3.0, var_nums.size()); ++i) {
         s = to_base_3(i);
         zeros = "";
@@ -274,11 +288,20 @@ computation_abstract::for_stencils(vector<int> var_nums, int offset, vector<vect
             vars = "(" + variables[0]->name;
             if (var_nums[0] == 0) {
                 if (s[0] == '1') {     //+ offset
-                    vars += " + " + to_string(k);
-                    (*accesses)[(i - 1) * offset + k - 1][0][variables.size()] = k;
+                    vars += " + " + to_string(k) + " + " + to_string(offset);
+                    //(*accesses)[(i - 1) * offset + k - 1][0][variables.size()] = k;
+                    int vars_size=variables.size();
+                    accesses_updates.push_back({(i - 1) * offset + k - 1,0,vars_size,k + offset});
                 } else if (s[0] == '2') {        //- offset
-                    vars += " - " + to_string(k);
-                    (*accesses)[(i - 1) * offset + k - 1][0][variables.size()] = k * (-1);
+                    vars += " - " + to_string(k)  + " + " + to_string(offset);
+                    //(*accesses)[(i - 1) * offset + k - 1][0][variables.size()] = k * (-1);
+                    int vars_size=variables.size();
+                    accesses_updates.push_back({(i - 1) * offset + k - 1,0,vars_size,k * (-1) + offset});
+                } else{
+                    vars += " + " + to_string(offset);
+                    //(*accesses)[(i - 1) * offset + k - 1][0][variables.size()] = k;
+                    int vars_size=variables.size();
+                    accesses_updates.push_back({(i - 1) * offset + k - 1,0,vars_size, offset});
                 }
                 pos++;
             }
@@ -286,20 +309,42 @@ computation_abstract::for_stencils(vector<int> var_nums, int offset, vector<vect
                 vars += ", " + variables[j]->name;
                 if (var_nums[pos] == j) {
                     if (s[pos] == '1') {     //+ offset
-                        vars += " + " + to_string(k);
-                        (*accesses)[(i - 1) * offset + k - 1][j][variables.size()] = k;
+                        vars += " + " + to_string(k)  + " + " + to_string(offset);
+                        //(*accesses)[(i - 1) * offset + k - 1][j][variables.size()] = k;
+                        int vars_size=variables.size();
+                        accesses_updates.push_back({(i - 1) * offset + k - 1,j,vars_size,k + offset});
+
                     } else if (s[pos] == '2') {        //- offset
-                        vars += " - " + to_string(k);
-                        (*accesses)[(i - 1) * offset + k - 1][j][variables.size()] = k * (-1);
+                        vars += " - " + to_string(k) + " + " + to_string(offset);
+                        //(*accesses)[(i - 1) * offset + k - 1][j][variables.size()] = k * (-1);
+                        int vars_size=variables.size();
+                        accesses_updates.push_back({(i - 1) * offset + k - 1,j,vars_size,k * (-1) + offset});
+                    } else{
+                        vars += " + " + to_string(offset);
+                        //(*accesses)[(i - 1) * offset + k - 1][j][variables.size()] = k * (-1);
+                        int vars_size=variables.size();
+                        accesses_updates.push_back({(i - 1) * offset + k - 1,j,vars_size, offset});
                     }
                     pos++;
                 }
             }
             vars += ")";
-            strings.push_back(vars);
+            if(find(strings.begin(), strings.end(), vars) == strings.end()) {
+                strings.push_back(vars);
+                for (int li=0; li<accesses_updates.size();li++){
+                    (*accesses)[accesses_updates[li][0]][accesses_updates[li][1]][accesses_updates[li][2]] = accesses_updates[li][3];
+                }
+            } else{
+                for (int li=0; li<accesses_updates.size();li++){
+
+                    to_erase.push_back(accesses_updates[li][0]);
+                }
+            }
+            accesses_updates.clear();
             vars = "";
         }
     }
+
     return strings;
 }
 
@@ -441,16 +486,17 @@ void tiramisu_code::write_footer() {
 
 
 void tiramisu_code::write_computations() {
+    new_line(1, indentation_level, &code_buffer);
     for (int i = 0; i < computations.size(); ++i) {
         if (computations[i]->type <= 3) {
-            new_line(2, indentation_level, &code_buffer);
+            new_line(1, indentation_level, &code_buffer);
             code_buffer += "computation " + computations[i]->name + "(\"" + computations[i]->name
                            + "\", " + computations[i]->variables_to_string() + ", " + computations[i]->expression +
                            ");";
             check_buffer_size(&code_buffer, &output_file);
         } else {
             if (!computations[i]->expression.empty()) {
-                new_line(2, indentation_level, &code_buffer);
+                new_line(1, indentation_level, &code_buffer);
                 code_buffer += "computation " + computations[i]->name + "(\"" + computations[i]->name
                                + "\", " + computations[i]->variables_to_string() + ", " + default_type + ");";
                 check_buffer_size(&code_buffer, &output_file);
@@ -464,12 +510,14 @@ void tiramisu_code::write_computations() {
 }
 
 void tiramisu_code::write_inputs() {
+    new_line(1, indentation_level, &code_buffer);
     for (int i = 0; i < inputs.size(); ++i) {
-        new_line(2, indentation_level, &code_buffer);
+        new_line(1, indentation_level, &code_buffer);
         code_buffer += "input " + inputs[i]->name + "(\"" + inputs[i]->name
                        + "\", " + inputs[i]->variables_to_string() + ", " + default_type + ");";
         check_buffer_size(&code_buffer, &output_file);
     }
+
 
 }
 
@@ -479,8 +527,11 @@ void tiramisu_code::generate_code() {
     for (int i = 1; i < buffers.size(); ++i) {
         code_buffer += ", &" + buffers[i]->name;
     }
+//    code_buffer +=
+//            "}, \"/home/masci/tiramisu_code_generator/build/" + function_name + ".o\");";
+    string batch_name = BATCH_NAME ;
     code_buffer +=
-            "}, \"../data/programs/function" + to_string(id) + "/" + function_name + "/" + function_name + ".o\");";
+        "}, \"../data/"+batch_name+"/programs/function" + to_string(id) + "/" + function_name + "/" + function_name + ".o\");";
 }
 
 void tiramisu_code::write_buffers() {
@@ -761,10 +812,11 @@ tiramisu_code::tiramisu_code(string function_name, vector<int> *padding_types, s
 
 
 void tiramisu_code::write_schedules() {
-    new_line(1, indentation_level, &code_buffer);
+    if (schedules.size()!=0)
+        new_line(1, indentation_level, &code_buffer);
     for (int i = 0; i < schedules.size(); ++i) {
         new_line(1, indentation_level, &code_buffer);
-        schedules[i]->write(&code_buffer);
+        schedules[i]->write(&code_buffer,indentation_level);
     }
 
 }
@@ -883,6 +935,43 @@ vector<schedule *> state::apply(computation *comp) {
         }
     }
     scheds.push_back(new schedule({comp}, PARALLELIZE, {}, {this->schedules.back().out_variables[0]}));
+    return scheds;
+
+}
+
+vector<schedule *> state::apply(vector<computation *>comps) {
+    vector <variable*> vect_vars;
+    //variable *v1 = new variable("i_vec", 21), *v2 = new variable("i_vec1", 22);
+    vector<schedule *> scheds;
+    for (int i = 0; i < this->schedules.size(); ++i) {
+        vect_vars.clear();
+        if ((this->schedules[i].schedule != NONE) && (this->schedules[i].schedule != NONE_UNROLL)) {
+            if (this->schedules[i].schedule == UNROLL){
+                vect_vars.push_back(this->schedules[i].in_variables[0]);
+                //vect_vars.push_back(v1);
+                // vect_vars.push_back(v2);
+                // scheds.push_back(new schedule({comp}, VECTORIZE, {VECTOR_SIZE}, vect_vars));
+                scheds.push_back(new schedule(comps, this->schedules[i].schedule, this->schedules[i].factors, this->schedules[i].in_variables));
+            }
+            else {
+                scheds.push_back(new schedule(comps, this->schedules[i].schedule, this->schedules[i].factors,
+                                              this->schedules[i].in_variables));
+            }
+        }
+        if (this->schedules[i].schedule == NONE_UNROLL) {
+            if(i != 0) {
+                vect_vars.push_back(this->schedules[i - 1].out_variables.back());
+            }
+            else vect_vars.push_back(comps[0]->variables.back());
+            // vect_vars.push_back(v1);
+            // vect_vars.push_back(v2);
+            //  scheds.push_back(new schedule({comp}, VECTORIZE, {VECTOR_SIZE}, vect_vars));
+        }
+        if (comps[0]->type == STENCIL){
+            //   comp->variables.back()->inf_value = VECTOR_SIZE;
+        }
+    }
+    scheds.push_back(new schedule(comps, PARALLELIZE, {}, {this->schedules.back().out_variables[0]}));
     return scheds;
 
 }

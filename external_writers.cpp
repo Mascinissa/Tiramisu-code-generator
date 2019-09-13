@@ -1,6 +1,10 @@
 #include "external_writers.h"
 #include "classes.h"
 #include "tiramisu_code_generator.h"
+#include <iostream>
+#include <fstream>
+#include <string>
+
 
 
 void generate_json_one_node(node_class *represented_node, int code_id){
@@ -41,8 +45,9 @@ void generate_json_one_node(node_class *represented_node, int code_id){
         new_line(1, indentation_level, &json);
 
         json += "\"assignments_array\" : [";
+        indentation_level++;
         for (int j = 0; j < represented_node->loops->loops_array[i]->assignments->n; ++j) {
-            new_line(1, ++indentation_level, &json);
+            new_line(1, indentation_level, &json);
             json += "{";
             new_line(1, ++indentation_level, &json);
             json += "\"id\" : " +
@@ -53,17 +58,20 @@ void generate_json_one_node(node_class *represented_node, int code_id){
                     to_string(represented_node->loops->loops_array[i]->assignments->assignments[j]->position);
             new_line(1, --indentation_level, &json);
             json += "},";
+
         }
         if (represented_node->loops->loops_array[i]->assignments->n > 0) {
             json = json.substr(0, json.size() - 1);
-            indentation_level--;
+            //indentation_level--;
         }
-        new_line(1, indentation_level, &json);
+        new_line(1, --indentation_level, &json);
         json += "]";
         new_line(1, --indentation_level, &json);
         json += "}";  //end assignments
+
         new_line(1, --indentation_level, &json);
         json += "},";
+
     }
     if (represented_node->loops->n > 0) {
         json = json.substr(0, json.size() - 1);
@@ -221,9 +229,14 @@ void generate_json_one_node(node_class *represented_node, int code_id){
     json += "}";
     new_line(1, --indentation_level, &json);
     json += "}";
-
     ofstream output_file;
+    mkdir(("samples/function" + to_string(code_id)).c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     output_file.open("samples/function" + to_string(code_id) + "/function" + to_string(code_id) + ".json");
+
+    if (!output_file) {
+        cout << "Unable to open file";
+        //exit(1); // terminate with error
+    }
     output_file << json;
     output_file.close();
 
@@ -232,8 +245,8 @@ void generate_json_one_node(node_class *represented_node, int code_id){
 //=====================================================================wrapper==========================================================================================================
 void generate_h_wrapper(string function_name, vector<buffer *> buffers, int code_id) {
     ofstream output;
-
     output.open("samples/function" + to_string(code_id) + "/" + function_name + "/" + function_name + "_wrapper.h");
+
     string code_buffer = "#ifndef HALIDE__generated_" + function_name + "_h\n"
                                                                         "#define HALIDE__generated_" + function_name +
                          "_h\n"
@@ -337,6 +350,7 @@ void generate_h_wrapper(string function_name, vector<buffer *> buffers, int code
 void generate_cpp_wrapper(string function_name, vector<buffer *> buffers, string *default_type_wrapper, int code_id) {
     ofstream output;
     output.open("samples/function" + to_string(code_id) + "/" + function_name + "/" + function_name + "_wrapper.cpp");
+
     string code_buffer = "#include \"Halide.h\"\n"
                          "#include \"" + function_name + "_wrapper.h\"\n"
                                                          "#include \"tiramisu/utils.h\"\n"
@@ -396,7 +410,10 @@ void generate_cpp_wrapper(string function_name, vector<buffer *> buffers, string
 
     code_buffer += "std::ofstream exec_times_file;";
     new_line(1, indentation_level, &code_buffer);
-    code_buffer += "exec_times_file.open(\"../data/programs/function" + to_string(code_id) + "/" + function_name +
+    //code_buffer += "exec_times_file.open(\"/home/masci/tiramisu_code_generator/cmake-build-debug/programs/function" + to_string(code_id) + "/" + function_name +
+    //               "/exec_times.txt\", std::ios_base::app);";
+    string batch_name = BATCH_NAME ;
+    code_buffer += "exec_times_file.open(\"../data/"+ batch_name +"/programs/function" + to_string(code_id) + "/" + function_name +
                    "/exec_times.txt\", std::ios_base::app);";
     new_line(1, indentation_level, &code_buffer);
     code_buffer += "if (exec_times_file.is_open()){";
@@ -528,8 +545,8 @@ void generate_json_schedules(schedules_class *schedules, int code_id, string fun
 
 
     ofstream output_file;
-
     output_file.open("samples/function" + to_string(code_id) + "/" + function_name + "/" + function_name + ".json");
+
     output_file << json;
     output_file.close();
 

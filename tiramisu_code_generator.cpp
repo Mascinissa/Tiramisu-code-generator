@@ -62,7 +62,7 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
     (*stats)[nb_dims - 2]->nb_progs++;
 
     string function_name = "function" + to_string(code_id);
-    vector<vector<variable *>> variables, variables_stencils;
+    vector<variable *> variables, variables_stencils;
     vector<variable*> all_vars;
     vector<computation *> computations;
     vector<buffer *> buffers;
@@ -74,8 +74,8 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
     int *variables_min_values_stencils = new int[computation_dims.size()];
     vector<constant *> variable_max_values_stencils;
 
-    //nb = rand() % nb_stages + 1;
-    nb = nb_stages;
+    nb = rand() % nb_stages + 1;
+    //nb = nb_stages;
     bool st = false;
 
     int inp, random_index;
@@ -88,21 +88,38 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
     computation *stage_computation;
 
     for (int i = 0; i < computation_dims.size(); ++i) {
+//        variables_min_values[i] = 0;
+//        variable_max_values.push_back(new constant("c" + to_string(i), computation_dims[i]));
+//        variables_min_values_stencils[i] = offset;
+//        variable_max_values_stencils.push_back(
+//                new constant("c" + to_string(i) + " - " + to_string(offset), computation_dims[i] - offset));
         variables_min_values[i] = 0;
         variable_max_values.push_back(new constant("c" + to_string(i), computation_dims[i]));
-        variables_min_values_stencils[i] = offset;
+        variables_min_values_stencils[i] = 0;
         variable_max_values_stencils.push_back(
-                new constant("c" + to_string(i) + " - " + to_string(offset), computation_dims[i] - offset));
+                new constant("c" + to_string(i) + " - " + to_string(offset)+ " - " + to_string(offset), computation_dims[i] - offset - offset));
     }
 
+    variables=generate_variables(computation_dims.size(), 0, variables_min_values, variable_max_values);
+    variables_stencils=generate_variables(computation_dims.size(),  100,
+                                                        variables_min_values_stencils, variable_max_values_stencils);
+
+
+    // since all computations must have same iterators, if one comp is a stencil all the other comps will have stencil iterators
+    vector <variable*> stencils_input_variables=variables;
+    if(find(types.begin(), types.end(), STENCIL) != types.end()) {
+
+        variables = variables_stencils;
+
+    }
+
+
     for (int i = 0; i < nb; ++i) {
-        variables.push_back(generate_variables(computation_dims.size(), i * computation_dims.size(), variables_min_values, variable_max_values));
-        variables_stencils.push_back(generate_variables(computation_dims.size(), 100 + i * computation_dims.size(),
-                                                        variables_min_values_stencils, variable_max_values_stencils));
+
         inp = rand() % nb_inputs + 1;
         switch (types[i]) {
             case ASSIGNMENT:
-                stage_computation = generate_computation("comp" + to_string(i), variables[i], ASSIGNMENT, {}, {}, 0,
+                stage_computation = generate_computation("comp" + to_string(i), variables, ASSIGNMENT, {}, {}, 0,
                                                          *default_type_tiramisu, id++);
                 computations.push_back(stage_computation);
                 abs = {stage_computation};
@@ -112,22 +129,22 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                 abs1.clear();
                 variables_inputs.clear();
                 for (int j = 0; j < inp; ++j) {
-                    int nb_vars = rand() % (variables[i].size() - 1) + 1;
+                    int nb_vars = rand() % (variables.size() - 1) + 1;
                     vars_inputs.clear();
                     if ((double) rand() / (RAND_MAX) < SHUFFLE_SAME_SIZE_PROB) {
-                        indexes = indexes_by_size(variables[i]);
-                        for (int k = 0; k < variables[i].size(); ++k) {
-                            auto var = indexes.find(variables[i][k]->sup_value->value)->second;
+                        indexes = indexes_by_size(variables);
+                        for (int k = 0; k < variables.size(); ++k) {
+                            auto var = indexes.find(variables[k]->sup_value->value)->second;
                             random_index = rand() % var.size();
-                            vars_inputs.push_back(variables[i][var[random_index]]);
-                            indexes.find(variables[i][k]->sup_value->value)->second.erase(
-                                    indexes.find(variables[i][k]->sup_value->value)->second.begin() + random_index);
+                            vars_inputs.push_back(variables[var[random_index]]);
+                            indexes.find(variables[k]->sup_value->value)->second.erase(
+                                    indexes.find(variables[k]->sup_value->value)->second.begin() + random_index);
                         }
                     }
                     else {
-                        vars_inputs = variables[i];
+                        vars_inputs = variables;
                     }
-                    int n_erase = variables[i].size() - nb_vars;
+                    int n_erase = variables.size() - nb_vars;
                     vector<int> input_dims = computation_dims;
                     for (int l = 0; l < n_erase; ++l) {
                         random_index = rand() % vars_inputs.size();
@@ -146,7 +163,7 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                     abs1.push_back(in);
                 }
                 //TODO: use previous stages as inputs in abs1
-                stage_computation = generate_computation("comp" + to_string(i), variables[i], ASSIGNMENT_INPUTS, abs1, {},
+                stage_computation = generate_computation("comp" + to_string(i), variables, ASSIGNMENT_INPUTS, abs1, {},
                                                          0, *default_type_tiramisu, id++);
                 computations.push_back(stage_computation);
                 abs = {stage_computation};
@@ -177,16 +194,20 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                 sort(var_nums_copy.begin(), var_nums_copy.end(), inf);
 
                 st = true;
+                //clearin abs for not using the previous computation as input
+                abs.clear();
                 if (abs.empty()) {
-                    input *in = new input("input" + to_string(i), &(variables[i]), *default_type_tiramisu, id++);
+                    // the "0" is because only one input is generated for the stencil
+                    input *in = new input("input" + to_string(i) + "0", &(stencils_input_variables), *default_type_tiramisu, id++);
                     abs = {in};
                     inputs.push_back(in);
                     abs = {in};
+                    // the "0" is because only one input is generated for the stencil
                     buffers.push_back(
-                            new buffer("buf" + to_string(i) + to_string(i), computation_dims, INPUT_BUFFER, &abs));
+                            new buffer("buf" + to_string(i) + "0", computation_dims, INPUT_BUFFER, &abs));
                     abs1.push_back(in);
                 }
-                stage_computation = generate_computation("comp" + to_string(i), variables_stencils[i], STENCIL, abs,
+                stage_computation = generate_computation("comp" + to_string(i), variables_stencils, STENCIL, abs,
                                                          var_nums_copy, offset, *default_type_tiramisu, id++);
                 computations.push_back(stage_computation);
                 abs = {stage_computation};
@@ -196,19 +217,21 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
         (*stats)[computation_dims.size() - 2]->types[types[i]]->nb_assignments++;
     }
 
-    for (int k = 0; (k < variables_stencils.size()) && st; ++k) {
+   /* for (int k = 0; (k < variables_stencils.size()) && st; ++k) {
         variables.push_back(variables_stencils[k]);
+    }*/
+
+    for (int k = 0; (k < stencils_input_variables.size()) && st; ++k) {
+        variables.push_back(stencils_input_variables[k]);
     }
 
-    for (int i = 0; i < variables.size(); ++i) {
-        for (int j = 0; j < variables[i].size(); ++j) {
-            all_vars.push_back(variables[i][j]);
-        }
+    for (int j = 0; j < variables.size(); ++j) {
+            all_vars.push_back(variables[j]);
     }
 
     vector<schedule *> schedules;
 
-    node_class *n = comp_to_node(computations[0], code_id);
+    node_class *n = comps_to_node(computations, code_id);
     generate_json_one_node(n, code_id);
 
     vector<schedule_params> schedules_parameters;
@@ -237,12 +260,16 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
     vector<variable*> all_schedule_variables;
 
     if (all_schedules) {
-        generate_all_schedules(schedules_parameters, computations[0], &schedules_exhaustive, &variables_exhaustive,
-                               &schedule_classes);
+        //generate_all_schedules(schedules_parameters, computations[0], &schedules_exhaustive, &variables_exhaustive,
+        //                       &schedule_classes);
+        generate_all_schedules_multiple_adj_comps(schedules_parameters, computations, &schedules_exhaustive, &variables_exhaustive,
+                                &schedule_classes);
     }
     else {
-        generate_random_schedules(nb_rand_schedules, schedules_parameters, computations[0], &schedules_exhaustive,
-                                  &variables_exhaustive, &schedule_classes);
+       // generate_random_schedules(nb_rand_schedules, schedules_parameters, computations[0], &schedules_exhaustive,
+          //                        &variables_exhaustive, &schedule_classes);
+        generate_random_schedules_multiple_adj_comps(nb_rand_schedules, schedules_parameters, computations, &schedules_exhaustive,
+                                                     &variables_exhaustive, &schedule_classes);
     }
 
 
@@ -284,7 +311,7 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
 
 
 
-node_class *comp_to_node(computation *comp, int seed) {
+/*node_class *comp_to_node(computation *comp, int seed) {
 
     vector<iterator_class *> iterators_array;
     for (int i = 0; i < comp->variables.size(); ++i) {
@@ -349,8 +376,160 @@ node_class *comp_to_node(computation *comp, int seed) {
     node->code_type = comp->type;
 
     return node;
-}
+}*/
 
+node_class *comps_to_node(vector<computation*> comps, int seed) {
+
+
+//    vector<iterator_class *> iterators_array;
+//    for (int i = 0; i < comps[0]->variables.size(); ++i) {
+//        iterators_array.push_back(new iterator_class(comps[0]->variables[i]->id, comps[0]->variables[i]->inf_value,
+//                                                     comps[0]->variables[i]->sup_value->value));
+//    }
+//
+//    iterators_class *iterators = new iterators_class(iterators_array.size(), iterators_array);
+
+
+    vector<iterator_class *> comps_iterators_array;
+    vector<int> comps_iterators_ids_array;
+    vector<iterator_class *> inputs_iterators_array;
+    vector<int> inputs_iterators_ids_array;
+
+    for (int i=0; i<comps.size(); i++){
+        for( int j=0 ; j< comps[i]->variables.size(); j++){
+
+            if(find(comps_iterators_ids_array.begin(), comps_iterators_ids_array.end(), comps[i]->variables[j]->id) == comps_iterators_ids_array.end()){
+                comps_iterators_ids_array.push_back(comps[i]->variables[j]->id);
+                comps_iterators_array.push_back(new iterator_class(comps[i]->variables[j]->id, comps[i]->variables[j]->inf_value,
+                                                                   comps[i]->variables[j]->sup_value->value));
+            }
+        }
+        for (int j=0; j< comps[i]->used_comps.size(); j++){
+            for (int k= 0; k < comps[i]->used_comps[j]->variables.size(); k++){
+                if(find(inputs_iterators_ids_array.begin(), inputs_iterators_ids_array.end(), comps[i]->used_comps[j]->variables[k]->id) == inputs_iterators_ids_array.end()){
+                    inputs_iterators_ids_array.push_back(comps[i]->used_comps[j]->variables[k]->id);
+                    inputs_iterators_array.push_back(new iterator_class(comps[i]->used_comps[j]->variables[k]->id, comps[i]->used_comps[j]->variables[k]->inf_value,
+                                                                        comps[i]->used_comps[j]->variables[k]->sup_value->value));
+                }
+            }
+        }
+    }
+
+    vector<iterator_class *> all_iterators_array;
+    for (int i=0; i< comps_iterators_array.size(); i++){
+        all_iterators_array.push_back(comps_iterators_array[i]);
+    }
+    for (int i=0; i< inputs_iterators_array.size(); i++){
+        if( find(comps_iterators_ids_array.begin(), comps_iterators_ids_array.end(), inputs_iterators_array[i]->id) == comps_iterators_ids_array.end()){
+            all_iterators_array.push_back(inputs_iterators_array[i]);
+        }
+    }
+    iterators_class *iterators = new iterators_class(all_iterators_array.size(), all_iterators_array);
+
+
+    /*vector<mem_access_class *> mem_accesses_array;
+    for (int i = 0; i < comps[0]->used_comps.size(); ++i) {
+        mem_accesses_array.push_back(new mem_access_class(comps[0]->used_comps[i]->id, comps[0]->used_comps_accesses[i]));
+    }
+
+    mem_accesses_class *mem_accesses = new mem_accesses_class(mem_accesses_array.size(), mem_accesses_array);*/
+
+
+
+    vector<mem_accesses_class*> mem_accesses;
+    for (int j=0; j<comps.size(); j++){
+        vector<mem_access_class *> mem_accesses_array;
+        for (int i = 0; i < comps[j]->used_comps.size(); ++i) {
+            mem_accesses_array.push_back(new mem_access_class(comps[j]->used_comps[i]->id, comps[j]->used_comps_accesses[i]));
+        }
+        mem_accesses.push_back(new mem_accesses_class(mem_accesses_array.size(), mem_accesses_array));
+    }
+
+
+    //vector<int> its, its_stencils;
+
+//    for (int i = 0; i < iterators_array.size(); ++i) {
+//        its.push_back(iterators_array[i]->id);
+//    }
+
+
+//    //not flexible, based on the fact that only stencils use different iterators
+//    if (comps[0]->type == STENCIL) {
+//        for (int i = 0; i < comps[0]->used_comps[0]->variables.size(); ++i) {
+//            iterators->n++;
+//            iterators->it_array.push_back(new iterator_class(comps[0]->used_comps[0]->variables[i]->id,
+//                                                             comps[0]->used_comps[0]->variables[i]->inf_value,
+//                                                             comps[0]->used_comps[0]->variables[i]->sup_value->value));
+//            its_stencils.push_back(comps[0]->used_comps[0]->variables[i]->id);
+//        }
+//       // inputs.push_back(new input_class(comps[0]->used_comps[0]->id, comps[0]->used_comps[0]->data_type, its_stencils));
+//    } else {
+//        for (int i = 0; i < comps[0]->used_comps.size(); ++i) {
+//            inputs.push_back(new input_class(comps[0]->used_comps[i]->id, comps[0]->used_comps[i]->data_type, its));
+//        }
+//
+//    }
+
+    vector<input_class *> inputs;
+    vector<int> inputs_ids;
+    for (int j = 0; j < comps.size(); j++){
+        for (int i = 0; i < comps[j]->used_comps.size(); ++i) {
+            //cout << comps[j]->used_comps[i]->id;
+            //insert the input in the vector if it's not already there, and it's not a computation
+            if((find(inputs_ids.begin(), inputs_ids.end(), comps[j]->used_comps[i]->id) == inputs_ids.end()) && (comps[j]->used_comps[i]->name.find("comp") == string::npos)) {
+                vector <int> input_iterators;
+                for (int k= 0; k < comps[j]->used_comps[i]->variables.size(); k++){
+                    input_iterators.push_back(comps[j]->used_comps[i]->variables[k]->id);
+                }
+                inputs.push_back(new input_class(comps[j]->used_comps[i]->id, comps[j]->used_comps[i]->data_type, input_iterators));
+                inputs_ids.push_back(comps[j]->used_comps[i]->id);
+
+            }
+        }
+    }
+
+    inputs_class *all_inputs = new inputs_class(inputs.size(), inputs);
+
+
+    vector<computation_class*> computation;
+    for (int i=0; i<comps.size(); i++){
+        vector <int> comp_iterators_ids;
+        for( int j=0 ; j< comps[i]->variables.size(); j++){
+            comp_iterators_ids.push_back(comps[i]->variables[j]->id);
+        }
+        computation.push_back(new computation_class(comps[i]->id, comps[i]->data_type, comp_iterators_ids, comps[i]->op_stats,
+                                                    mem_accesses[i]));
+
+    }
+
+    //computation_class *computation = new computation_class(comp->id, comp->data_type, its, comp->op_stats,mem_accesses);
+
+    computations_class *computations = new computations_class(computation.size(), computation);
+
+    //assignment_class *assignment = new assignment_class(comps[0]->id, 0);
+    vector<assignment_class*> assignment;
+    for (int i=0; i<comps.size();i++){
+        assignment.push_back(new assignment_class(comps[i]->id, i));
+    }
+
+    assignments_class *assignments = new assignments_class(comps.size(), assignment);
+
+
+    vector<loop_class *> loops_array;
+    for (int i = 0; i < comps[0]->variables.size(); ++i) {
+        loops_array.push_back(new loop_class(i, i - 1, 0, comps[0]->variables[i]->id, new assignments_class(0, {})));
+        //loops_array.push_back(new loop_class(i, i - 1, 0, iterators_array[i]->id, new assignments_class(0, {})));
+    }
+    loops_array[comps[0]->variables.size() - 1]->assignments = assignments;
+
+    loops_class *loops = new loops_class(comps[0]->variables.size(), loops_array);
+
+    node_class *node = new node_class(seed, loops, computations, iterators, all_inputs);
+
+    node->code_type = comps[0]->type;
+
+    return node;
+}
 
 //=====================================================================random_generator==========================================================================================================
 //automatically generating computation
@@ -400,11 +579,40 @@ computation *generate_computation(string name, vector<variable *> computation_va
                 access.push_back(vect);
             }
             c->used_comps_accesses.push_back(access);
+
             c->used_comps.push_back(inputs[0]);
         }
         c->expression = stencil_expression_generator(inputs[0]->name, c, &var_nums, offset, c->op_stats,
                                                      &c->used_comps_accesses);
+        vector <int> duplicate_indexes;
+        for (int i = 0; i < c->used_comps_accesses.size(); i++ ){
+            for (int j = i+1; j < c->used_comps_accesses.size(); j++){
+                bool is_duplicate= true;
+                if (c->used_comps_accesses[i].size() != c->used_comps_accesses[j].size()){
+                    is_duplicate = false;
+                } else {
+                    for (int k = 0; k < c->used_comps_accesses[i].size(); k++){
+                        if (c->used_comps_accesses[i][k] != c->used_comps_accesses[j][k]){
+
+                            is_duplicate= false;
+                        }
+                    }
+                }
+                if (is_duplicate)
+                    duplicate_indexes.push_back(j);
+            }
+        }
+        sort(duplicate_indexes.begin(), duplicate_indexes.end(), greater<int>());
+        auto last = unique(duplicate_indexes.begin(), duplicate_indexes.end());
+        duplicate_indexes.erase(last, duplicate_indexes.end());
+        for (int i = 0; i< duplicate_indexes.size();i++){
+            c->used_comps_accesses.erase(c->used_comps_accesses.begin()+ duplicate_indexes[i]);
+            c->used_comps.erase(c->used_comps.begin()+ duplicate_indexes[i]);
+
+        }
+
     }
+
     return c;
 }
 
@@ -655,9 +863,42 @@ void generate_all_schedules(vector<schedule_params> schedules, computation *comp
     }
 }
 
+void generate_all_schedules_multiple_adj_comps(vector<schedule_params> schedules, vector<computation*> comps, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes){
+    deque<state*> q;
+    state *current_state;
+    int current_level = 0, cpt = 0;
+    vector<vector<schedule*>> schedules_exhaustive;
+    vector<configuration> stage_configurations = generate_configurations(schedules[current_level].schedule, schedules[current_level].factors, comps[0]->variables, comps[0]->type),
+            passed_configurations;
+    for (int i = 0; i < stage_configurations.size(); i++){
+        q.insert(q.begin() + i, new state({stage_configurations[i]}, current_level));
+    }
+    while (!q.empty()){
+        current_state = q.front();
+        q.pop_front();
+        if (current_state->is_extendable(schedules.size())){
+            passed_configurations = current_state->schedules;
+            current_level = current_state->level + 1;
+            stage_configurations = generate_configurations(schedules[current_level].schedule, schedules[current_level].factors, current_state->schedules.back().out_variables, comps[0]->type);
+            for (int i = 0; i < stage_configurations.size(); i++){
+                passed_configurations.push_back(stage_configurations[i]);
+                q.insert(q.begin() + i, new state(passed_configurations, current_level));
+                passed_configurations.pop_back();
+            }
+        }
+        if (current_state->is_appliable(schedules.size())){
+            (*generated_schedules).push_back(current_state->apply(comps));
+            (*generated_variables).push_back(current_state->schedules.back().out_variables);
+            (*schedule_classes).push_back(confs_to_sc(current_state->schedules));
+            cpt++;
+        }
+    }
+}
 
 
-void generate_random_schedules(int nb_schedules, vector<schedule_params> schedules, computation *comp, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes){
+
+void generate_random_schedules(int nb_schedules, vector<schedule_params> schedules, computation *comp,
+                              vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes){
     int num, n_attempts = 5, attempts = 0;
     string s;
     vector<variable*> computation_variables;
@@ -697,6 +938,49 @@ void generate_random_schedules(int nb_schedules, vector<schedule_params> schedul
         (*schedule_classes).push_back(confs_to_sc(configs));
     }
 }
+
+void generate_random_schedules_multiple_adj_comps(int nb_schedules, vector<schedule_params> schedules, vector<computation*> comps,
+                               vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes){
+    int num, n_attempts = 5, attempts = 0;
+    string s;
+    vector<variable*> computation_variables;
+    vector<schedule*> generated_schedule;
+    vector<configuration> configs;
+    configuration conf;
+    (*generated_schedules).push_back(generated_schedule);
+    (*generated_variables).push_back(computation_variables);
+    conf.schedule = NONE;
+    configs.push_back(conf);
+    configs.push_back(conf);
+    configs.push_back(conf);
+    (*schedule_classes).push_back(confs_to_sc(configs));
+    for (int i = 0; i < nb_schedules; ++i) {
+        generated_schedule.clear();
+        computation_variables = comps[0]->variables;
+        num = rand() % ((int) pow(2.0, schedules.size()) - 1) + 1;
+        s = to_base_2(num, schedules.size());
+        for (int j = 0; j < schedules.size(); ++j) {
+            if (s[j] == '1') {
+                attempts = 0;
+                conf = random_conf(schedules[j], comps[0]->type, computation_variables);
+                while ((!is_valid(conf)) && (attempts < n_attempts)){
+                    conf = random_conf(schedules[j], comps[0]->type, computation_variables);
+                    attempts++;
+                }
+                if (attempts == n_attempts) continue;
+                computation_variables = conf.out_variables;
+                if (conf.schedule != NONE) {
+                    generated_schedule.push_back(new schedule(comps, conf.schedule, conf.factors, conf.in_variables));
+                }
+                configs.push_back(conf);
+            }
+        }
+        (*generated_schedules).push_back(generated_schedule);
+        (*generated_variables).push_back(computation_variables);
+        (*schedule_classes).push_back(confs_to_sc(configs));
+    }
+}
+
 
 
 schedules_class *confs_to_sc(vector<configuration> schedules){

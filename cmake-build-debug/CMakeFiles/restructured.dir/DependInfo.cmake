@@ -4,10 +4,10 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
-  "/home/isra/tiramisu_code_generator/classes.cpp" "/home/isra/tiramisu_code_generator/cmake-build-debug/CMakeFiles/restructured.dir/classes.cpp.o"
-  "/home/isra/tiramisu_code_generator/external_writers.cpp" "/home/isra/tiramisu_code_generator/cmake-build-debug/CMakeFiles/restructured.dir/external_writers.cpp.o"
-  "/home/isra/tiramisu_code_generator/main.cpp" "/home/isra/tiramisu_code_generator/cmake-build-debug/CMakeFiles/restructured.dir/main.cpp.o"
-  "/home/isra/tiramisu_code_generator/tiramisu_code_generator.cpp" "/home/isra/tiramisu_code_generator/cmake-build-debug/CMakeFiles/restructured.dir/tiramisu_code_generator.cpp.o"
+  "/home/masci/Tiramisu-code-generator/classes.cpp" "/home/masci/Tiramisu-code-generator/cmake-build-debug/CMakeFiles/restructured.dir/classes.cpp.o"
+  "/home/masci/Tiramisu-code-generator/external_writers.cpp" "/home/masci/Tiramisu-code-generator/cmake-build-debug/CMakeFiles/restructured.dir/external_writers.cpp.o"
+  "/home/masci/Tiramisu-code-generator/main.cpp" "/home/masci/Tiramisu-code-generator/cmake-build-debug/CMakeFiles/restructured.dir/main.cpp.o"
+  "/home/masci/Tiramisu-code-generator/tiramisu_code_generator.cpp" "/home/masci/Tiramisu-code-generator/cmake-build-debug/CMakeFiles/restructured.dir/tiramisu_code_generator.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")
 

@@ -6,17 +6,21 @@
 
 #IncludeRegexTransform: 
 
-/home/isra/tiramisu_code_generator/classes.cpp
+/home/masci/Tiramisu-code-generator/classes.cpp
 cmath
 -
 sys/stat.h
 -
 classes.h
-/home/isra/tiramisu_code_generator/classes.h
+/home/masci/Tiramisu-code-generator/classes.h
 external_writers.h
-/home/isra/tiramisu_code_generator/external_writers.h
+/home/masci/Tiramisu-code-generator/external_writers.h
+algorithm
+-
+string
+-
 
-/home/isra/tiramisu_code_generator/classes.h
+/home/masci/Tiramisu-code-generator/classes.h
 string
 -
 vector
@@ -30,15 +34,21 @@ iostream
 fstream
 -
 
-/home/isra/tiramisu_code_generator/external_writers.cpp
+/home/masci/Tiramisu-code-generator/external_writers.cpp
 external_writers.h
-/home/isra/tiramisu_code_generator/external_writers.h
+/home/masci/Tiramisu-code-generator/external_writers.h
 classes.h
-/home/isra/tiramisu_code_generator/classes.h
+/home/masci/Tiramisu-code-generator/classes.h
 tiramisu_code_generator.h
-/home/isra/tiramisu_code_generator/tiramisu_code_generator.h
+/home/masci/Tiramisu-code-generator/tiramisu_code_generator.h
+iostream
+-
+fstream
+-
+string
+-
 
-/home/isra/tiramisu_code_generator/external_writers.h
+/home/masci/Tiramisu-code-generator/external_writers.h
 string
 -
 iostream
@@ -46,9 +56,9 @@ iostream
 fstream
 -
 classes.h
-/home/isra/tiramisu_code_generator/classes.h
+/home/masci/Tiramisu-code-generator/classes.h
 
-/home/isra/tiramisu_code_generator/main.cpp
+/home/masci/Tiramisu-code-generator/main.cpp
 iostream
 -
 string
@@ -56,21 +66,21 @@ string
 sstream
 -
 tiramisu_code_generator.h
-/home/isra/tiramisu_code_generator/tiramisu_code_generator.h
+/home/masci/Tiramisu-code-generator/tiramisu_code_generator.h
 random
 -
 cstdlib
 -
 
-/home/isra/tiramisu_code_generator/tiramisu_code_generator.cpp
+/home/masci/Tiramisu-code-generator/tiramisu_code_generator.cpp
 random
 -
 algorithm
 -
 tiramisu_code_generator.h
-/home/isra/tiramisu_code_generator/tiramisu_code_generator.h
+/home/masci/Tiramisu-code-generator/tiramisu_code_generator.h
 
-/home/isra/tiramisu_code_generator/tiramisu_code_generator.h
+/home/masci/Tiramisu-code-generator/tiramisu_code_generator.h
 string
 -
 vector
@@ -88,7 +98,7 @@ cmath
 map
 -
 classes.h
-/home/isra/tiramisu_code_generator/classes.h
+/home/masci/Tiramisu-code-generator/classes.h
 external_writers.h
-/home/isra/tiramisu_code_generator/external_writers.h
+/home/masci/Tiramisu-code-generator/external_writers.h
 

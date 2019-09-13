@@ -51,6 +51,11 @@
 
 #define INF (-100)
 
+#define CODES_FROM 1001
+//BATCH_SIZE is only used for naming the folders, to change the real batch size edit input.txt
+#define BATCH_SIZE 100
+#define BATCH_NAME "batch"+to_string(CODES_FROM)+"-"+to_string(CODES_FROM+BATCH_SIZE-1)
+
 
 using namespace std;
 
@@ -154,7 +159,7 @@ public:
     vector <int> factors;
     vector <variable*> vars;
     schedule(vector <computation*> comps, int type, vector <int> factors, vector <variable*> vars);
-    void write(string *code_buffer);
+    void write(string *code_buffer, int indentation_level);
 
 private:
     string vars_to_string(int from, int to);
@@ -346,6 +351,7 @@ public:
     bool is_appliable(int nb_schedules);
     state(vector<configuration> schedules, int level);
     vector<schedule*> apply(computation *comp);
+    vector<schedule*> apply(vector<computation *>comps);
 };
 bool is_valid(configuration conf);
 
