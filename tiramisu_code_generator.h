@@ -8,7 +8,8 @@
 #define STENCIL 2
 #define TILE_2_PROB 0.5
 #define MAX_STENCIL_SIZE 3
-#define SHUFFLE_SAME_SIZE_PROB 0.1
+#define SHUFFLE_SAME_SIZE_PROB 0.5
+#define ITERATOR_REUSE_PROB 0.7
 
 
 
@@ -58,6 +59,7 @@ vector <int> generate_padding_types(int nb_layers, double *padding_probs);
 
 //=====================================================================tiramisu_code_generator==========================================================================================================
 vector <variable*> generate_variables(int nb_variables, int from, int *inf_values, vector <constant*> constants);
+vector<variable *> generate_variables(int nb_variables, int name_from, vector<int> inf_values, vector<constant *> constants, int vects_from);
 
 void generate_tiramisu_code_single_computation(int code_id, int computation_type,
                                                vector<int> *var_nums, int nb_inputs, string *default_type_tiramisu,
@@ -78,6 +80,10 @@ void generate_all_schedules_multiple_adj_comps(vector<schedule_params> schedules
 
 void generate_random_schedules(int nb_schedules, vector<schedule_params> schedules, computation *comp, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes);
 void generate_random_schedules_multiple_adj_comps(int nb_schedules, vector<schedule_params> schedules, vector<computation*> comps, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes);
+void generate_all_schedules_shared_vars(vector<schedule_params> schedules, vector<computation*> comps,
+        vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables,
+        vector<schedules_class*> *schedule_classes, vector<variable *> variables);
+
 
 schedules_class *confs_to_sc(vector<configuration> schedules);
 string to_base_2(int num, int nb_pos);

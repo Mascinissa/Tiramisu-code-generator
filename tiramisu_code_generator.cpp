@@ -9,10 +9,17 @@ bool inf(int i, int j) { return (i < j); }
 
 
 
-vector<variable *> generate_variables(int nb_variables, int from, int *inf_values, vector<constant *> constants) {
+vector<variable *> generate_variables(int nb_variables, int name_from, int *inf_values, vector<constant *> constants) {
     vector<variable *> variables;
-    for (int i = from; i < nb_variables + from; ++i) {
-        variables.push_back(new variable("i" + to_string(i), i, inf_values[i - from], constants[i - from]));
+    for (int i = name_from; i < nb_variables + name_from; ++i) {
+        variables.push_back(new variable("i" + to_string(i), i, inf_values[i - name_from], constants[i - name_from]));
+    }
+    return variables;
+}
+vector<variable *> generate_variables(int nb_variables, int name_from, vector<int> inf_values, vector<constant *> constants, int vects_from) {
+    vector<variable *> variables;
+    for (int i = vects_from; i < nb_variables + vects_from; ++i) {
+        variables.push_back(new variable("i" + to_string(i + name_from - vects_from), i + name_from, inf_values[i], constants[i]));
     }
     return variables;
 }
@@ -42,37 +49,46 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
     //initializations
     srand(code_id);
     cout << "_________________code " + to_string(code_id) + "________________" << endl;
+    //offset is max_offset (stencils) from input.txt
     offset = rand() % offset + 1;
-    int id = 0, nb, nb_dims = (rand() % (max_nb_dims - 1)) + 2, sum = 0, const_sum = MAX_MEMORY_SIZE - nb_dims * MIN_LOOP_DIM;
-    vector<int> computation_dims;
-    for (int i = 0; i < nb_dims; ++i) {
-        computation_dims.push_back((rand() % MAX_CONST_VALUE) + 1);
-        sum += computation_dims[i];
+
+    //max_nb_dims from input.txt (number of nested loops)
+    int id = 0, nb, nb_shared_dims = (rand() % (max_nb_dims - 2)) + 2 , sum = 0, const_sum = MAX_MEMORY_SIZE - nb_shared_dims * MIN_LOOP_DIM;
+//    int id = 0, nb, nb_dims = max_nb_dims, sum = 0, const_sum = MAX_MEMORY_SIZE - nb_dims * MIN_LOOP_DIM;
+
+    vector<int> computation_shared_dims;
+
+    //computation_dims contains the range of each iterator??, makes it a power of 2
+    for (int i = 0; i < nb_shared_dims; ++i) {
+        computation_shared_dims.push_back((rand() % MAX_CONST_VALUE) + 1);
+        sum += computation_shared_dims[i];
     }
 
-    for (int i = 0; i < nb_dims; ++i) {
-        computation_dims[i] *= const_sum;
-        computation_dims[i] /= sum;
-        computation_dims[i] += MIN_LOOP_DIM;
-        computation_dims[i] = (int) pow(2.0, computation_dims[i]);
+    for (int i = 0; i < nb_shared_dims; ++i) {
+        computation_shared_dims[i] *= const_sum;
+        computation_shared_dims[i] /= sum;
+        computation_shared_dims[i] += MIN_LOOP_DIM;
+        computation_shared_dims[i] = (int) pow(2.0, computation_shared_dims[i]);
     }
-    (*stats)[nb_dims - 2]->data_sizes[const_sum]++;
+//    (*stats)[nb_shared_dims - 2]->data_sizes[const_sum]++;
 
 
-    (*stats)[nb_dims - 2]->nb_progs++;
+//    (*stats)[nb_shared_dims - 2]->nb_progs++;
+
 
     string function_name = "function" + to_string(code_id);
-    vector<variable *> variables, variables_stencils;
+//    vector<variable *> variables, variables_stencils;
+    vector<variable *> shared_variables, shared_variables_stencils;
     vector<variable*> all_vars;
     vector<computation *> computations;
     vector<buffer *> buffers;
     vector<input *> inputs;
     vector<computation_abstract *> abs, abs1;
 
-    int *variables_min_values = new int[computation_dims.size()];
-    vector<constant *> variable_max_values;
-    int *variables_min_values_stencils = new int[computation_dims.size()];
-    vector<constant *> variable_max_values_stencils;
+    int *shared_variables_min_values = new int[computation_shared_dims.size()];
+    vector<constant *> shared_variable_max_values;
+    int *shared_variables_min_values_stencils = new int[computation_shared_dims.size()];
+    vector<constant *> shared_variable_max_values_stencils;
 
     nb = rand() % nb_stages + 1;
     //nb = nb_stages;
@@ -87,38 +103,181 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
     vector<int> types = computation_types(nb_stages, probs), new_indices;
     computation *stage_computation;
 
-    for (int i = 0; i < computation_dims.size(); ++i) {
-//        variables_min_values[i] = 0;
-//        variable_max_values.push_back(new constant("c" + to_string(i), computation_dims[i]));
-//        variables_min_values_stencils[i] = offset;
-//        variable_max_values_stencils.push_back(
-//                new constant("c" + to_string(i) + " - " + to_string(offset), computation_dims[i] - offset));
-        variables_min_values[i] = 0;
-        variable_max_values.push_back(new constant("c" + to_string(i), computation_dims[i]));
-        variables_min_values_stencils[i] = 0;
-        variable_max_values_stencils.push_back(
-                new constant("c" + to_string(i) + " - " + to_string(offset)+ " - " + to_string(offset), computation_dims[i] - offset - offset));
+    //creates iterators (called variables here) (for stencil and non stencil) with ranges from computation_dims
+    for (int i = 0; i < computation_shared_dims.size(); ++i) {
+        shared_variables_min_values[i] = 0;
+        shared_variable_max_values.push_back(new constant("c" + to_string(i), computation_shared_dims[i]));
+        shared_variables_min_values_stencils[i] = 0;
+        shared_variable_max_values_stencils.push_back(
+                new constant("c" + to_string(i) + " - " + to_string(offset)+ " - " + to_string(offset),
+                computation_shared_dims[i] - offset - offset));
     }
 
-    variables=generate_variables(computation_dims.size(), 0, variables_min_values, variable_max_values);
-    variables_stencils=generate_variables(computation_dims.size(),  100,
-                                                        variables_min_values_stencils, variable_max_values_stencils);
+    shared_variables=generate_variables(computation_shared_dims.size(), 0, shared_variables_min_values, shared_variable_max_values);
+    shared_variables_stencils=generate_variables(computation_shared_dims.size(),  100,
+                                                 shared_variables_min_values_stencils, shared_variable_max_values_stencils);
+
+
+
+
+
+
+
+
+
+
+
+
+    vector<vector<int>> computation_unshared_dims;
+
+    int nb_new_dims=0 ;
+    vector<vector<int>> unshared_variables_min_values;
+    vector<vector<int>> unshared_variables_min_values_stencils;
+    vector<vector<constant *>> unshared_variable_max_values;
+    vector<vector<constant *>> unshared_variable_max_values_stencils;
+    vector<vector <variable *>> unshared_variables, unshared_variables_stencils;
+
+    //generate randomly nb(number of computations) list of variables and computation_dims arrays
+    for (int cpt_compt = 0; cpt_compt<nb; cpt_compt++){
+
+        int reused_depth = 0 ;
+        double reuse_var = (double) rand() / (RAND_MAX);
+        if ((reuse_var < ITERATOR_REUSE_PROB) && (cpt_compt>0)){
+            int reused_branch = rand() % cpt_compt;
+            if (cpt_compt == 1)
+                reused_branch = 0; // if it's generating the second computation (comp 1 ) only branch 0 exits
+            if (computation_unshared_dims[reused_branch].size()<=1){
+                reused_depth = 1;
+            } else {
+                reused_depth = (rand() % (computation_unshared_dims[reused_branch].size())) +1;
+            }
+            computation_unshared_dims.push_back(vector<int> (computation_unshared_dims[reused_branch].begin(), computation_unshared_dims[reused_branch].begin() + reused_depth));
+            unshared_variable_max_values.push_back(vector<constant *> (unshared_variable_max_values[reused_branch].begin(), unshared_variable_max_values[reused_branch].begin() + reused_depth));
+            unshared_variable_max_values_stencils.push_back(vector<constant *> (unshared_variable_max_values_stencils[reused_branch].begin(), unshared_variable_max_values_stencils[reused_branch].begin() + reused_depth));
+            unshared_variables_min_values.push_back(vector<int> (unshared_variables_min_values[reused_branch].begin(), unshared_variables_min_values[reused_branch].begin() + reused_depth ));
+            unshared_variables_min_values_stencils.push_back(vector<int> (unshared_variables_min_values_stencils[reused_branch].begin(), unshared_variables_min_values_stencils[reused_branch].begin() + reused_depth ));
+            unshared_variables.push_back(vector<variable *> (unshared_variables[reused_branch].begin(), unshared_variables[reused_branch].begin() + reused_depth));
+            unshared_variables_stencils.push_back(vector<variable *> (unshared_variables_stencils[reused_branch].begin(), unshared_variables_stencils[reused_branch].begin() + reused_depth));
+
+            nb_new_dims = (rand() % (max_nb_dims - nb_shared_dims + 1 - reused_depth))  ;
+        } else {
+            nb_new_dims = (rand() % (max_nb_dims - nb_shared_dims + 1)) ;
+            if (nb_new_dims==0) nb_new_dims=1; // this is because the code doesn't yet support stencils on shared iterator, so there must always be at least one unshared dim, remove this line once it supports that
+
+            vector<int> place_holder_int;
+            computation_unshared_dims.push_back(place_holder_int);
+            vector<constant *> place_holder;
+            unshared_variable_max_values.push_back(place_holder);
+            vector<constant *> place_holder_stencil;
+            unshared_variable_max_values_stencils.push_back(place_holder_stencil);
+            vector<int> place_holder_minval;
+            unshared_variables_min_values.push_back(place_holder_minval);
+            vector<int> place_holder_minval_stencil;
+            unshared_variables_min_values_stencils.push_back(place_holder_minval_stencil);
+            vector <variable *> place_holder_var;
+            unshared_variables.push_back(place_holder_var);
+            vector <variable *> place_holder_var_stencil;
+            unshared_variables_stencils.push_back(place_holder_var_stencil);
+
+
+        }
+
+
+
+
+        for (int i = reused_depth; i < nb_new_dims + reused_depth; ++i) {
+            computation_unshared_dims[cpt_compt].push_back((rand() % MAX_CONST_VALUE) + 1);
+            sum += computation_unshared_dims[cpt_compt][i];
+        }
+        for (int i = reused_depth; i < nb_new_dims + reused_depth; ++i) {
+            computation_unshared_dims[cpt_compt][i] *= const_sum;
+            computation_unshared_dims[cpt_compt][i] /= sum;
+            computation_unshared_dims[cpt_compt][i] += MIN_LOOP_DIM;
+            computation_unshared_dims[cpt_compt][i] = (int) pow(2.0, computation_unshared_dims[cpt_compt][i]);
+        }
+
+        for (int i = reused_depth; i < nb_new_dims + reused_depth; ++i) {
+            unshared_variables_min_values[cpt_compt].push_back(0);
+            unshared_variable_max_values[cpt_compt].push_back(new constant("c" + to_string(cpt_compt) + to_string(i), computation_unshared_dims[cpt_compt][i]));
+            unshared_variables_min_values_stencils[cpt_compt].push_back(0);
+            unshared_variable_max_values_stencils[cpt_compt].push_back(
+                    new constant("c" + to_string(cpt_compt) + to_string(i) + " - " + to_string(offset)+ " - " + to_string(offset),
+                                 computation_unshared_dims[cpt_compt][i] - offset - offset));
+        }
+
+        vector <variable *> new_vars = generate_variables(nb_new_dims, 1000 + cpt_compt*10,
+                           unshared_variables_min_values[cpt_compt], unshared_variable_max_values[cpt_compt], reused_depth);
+        unshared_variables[cpt_compt].insert(unshared_variables[cpt_compt].end(), new_vars.begin(), new_vars.end());
+        vector <variable *> new_vars_stencil = generate_variables(nb_new_dims,  1100 + cpt_compt*10,
+                                                                  unshared_variables_min_values_stencils[cpt_compt], unshared_variable_max_values_stencils[cpt_compt], reused_depth);
+        unshared_variables_stencils[cpt_compt].insert(unshared_variables_stencils[cpt_compt].end(), new_vars_stencil.begin(), new_vars_stencil.end() );
+
+    }
+
+
+
+//    (*stats)[nb_shared_dims - 2]->data_sizes[const_sum]++;
+//    (*stats)[nb_shared_dims - 2]->nb_progs++;
+//    vector<variable *> variables, variables_stencils;
+//    vector<variable *> shared_variables, shared_variables_stencils;
+//    vector<variable*> all_vars;
+//    vector<computation *> computations;
+//    vector<buffer *> buffers;
+//    vector<input *> inputs;
+//    vector<computation_abstract *> abs, abs1;
+
+//    map<int, vector<int>> indexes;
+//    vector<vector<variable *>> variables_inputs;
+//    vector<variable *> vars_inputs;
+
+//    vector<int> types = computation_types(nb_stages, probs), new_indices;
+//    computation *stage_computation;
+
+    //creates iterators (called variables here) (for stencil and non stencil) with ranges from computation_dims
+
+
+
+//    vector<variable *> variables_indep=generate_variables(max_nb_dims-computation_dims.size(), 1000, variables_min_values, variable_max_values);
+
+
+
 
 
     // since all computations must have same iterators, if one comp is a stencil all the other comps will have stencil iterators
-    vector <variable*> stencils_input_variables=variables;
-    if(find(types.begin(), types.end(), STENCIL) != types.end()) {
 
-        variables = variables_stencils;
+//    if(find(types.begin(), types.end(), STENCIL) != types.end()) {
+//
+//        variables = variables_stencils;
+//
+//    }
+//
+//    vector<variable *> conc_var;
+//    conc_var.insert( conc_var.end(), variables.begin(), variables.end() );
+//    conc_var.insert( conc_var.end(), variables_indep.begin(), variables_indep.end() );
+//    variables = conc_var;
 
-    }
 
-
+    // variables becomes shared variables, create a list of list of indep variables randomly (intersection can be not empty but the order
+    // must be respected), each time generating a comp use as variable parameter one of the indep variable list concatenated with the shared var list
+    vector<variable *> variables;
+    vector<variable *> variables_stencils;
+    vector<int> computation_dims;
     for (int i = 0; i < nb; ++i) {
+        // nb_inputs is max number of input buffers
+        int comp_variables_choice = rand() % nb;
+        variables.clear();
+        variables_stencils.clear();
+        computation_dims.clear();
+        computation_dims.insert(computation_dims.begin(), computation_shared_dims.begin(), computation_shared_dims.end());
+        computation_dims.insert(computation_dims.begin(), computation_unshared_dims[comp_variables_choice].begin(), computation_unshared_dims[comp_variables_choice].end());
+
 
         inp = rand() % nb_inputs + 1;
         switch (types[i]) {
             case ASSIGNMENT:
+                variables.insert(variables.end(), shared_variables.begin(), shared_variables.end());
+                variables.insert(variables.end(), unshared_variables[comp_variables_choice].begin(), unshared_variables[comp_variables_choice].end() );
+
                 stage_computation = generate_computation("comp" + to_string(i), variables, ASSIGNMENT, {}, {}, 0,
                                                          *default_type_tiramisu, id++);
                 computations.push_back(stage_computation);
@@ -126,6 +285,8 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                 buffers.push_back(new buffer("buf" + to_string(i), computation_dims, OUTPUT_BUFFER, &abs));
                 break;
             case ASSIGNMENT_INPUTS:
+                variables.insert(variables.end(), shared_variables.begin(), shared_variables.end());
+                variables.insert(variables.end(), unshared_variables[comp_variables_choice].begin(), unshared_variables[comp_variables_choice].end() );
                 abs1.clear();
                 variables_inputs.clear();
                 for (int j = 0; j < inp; ++j) {
@@ -172,11 +333,18 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
 
                 break;
             case STENCIL:
+                variables_stencils.insert(variables_stencils.end(), shared_variables.begin(), shared_variables.end());
+                variables_stencils.insert(variables_stencils.end(), unshared_variables_stencils[comp_variables_choice].begin(), unshared_variables_stencils[comp_variables_choice].end() );
+                vector <variable*> stencils_input_variables;
+                stencils_input_variables.insert(stencils_input_variables.end(), shared_variables.begin(), shared_variables.end());
+                stencils_input_variables.insert(stencils_input_variables.end(),unshared_variables[comp_variables_choice].begin(), unshared_variables[comp_variables_choice].end());
+
                 vector<int> var_nums_copy;
                 vector<int> var_nums_copy_copy;
 
-                for (int l = 0; l < variables_stencils.size(); ++l) {
-                    var_nums_copy_copy.push_back(i);
+                // TODO: I actually use only unshared variables for stencil operations (as stencil iterators)
+                for (int l = shared_variables.size(); l < variables_stencils.size(); ++l) {
+                    var_nums_copy_copy.push_back(l);
                 }
 
                 auto rng = default_random_engine{};
@@ -194,7 +362,7 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                 sort(var_nums_copy.begin(), var_nums_copy.end(), inf);
 
                 st = true;
-                //clearin abs for not using the previous computation as input
+                //clearing abs for not using the previous computation as input
                 abs.clear();
                 if (abs.empty()) {
                     // the "0" is because only one input is generated for the stencil
@@ -207,6 +375,8 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                             new buffer("buf" + to_string(i) + "0", computation_dims, INPUT_BUFFER, &abs));
                     abs1.push_back(in);
                 }
+                if (code_id==1007)
+                    cout<< "1007";
                 stage_computation = generate_computation("comp" + to_string(i), variables_stencils, STENCIL, abs,
                                                          var_nums_copy, offset, *default_type_tiramisu, id++);
                 computations.push_back(stage_computation);
@@ -214,20 +384,48 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                 buffers.push_back(new buffer("buf" + to_string(i), computation_dims, OUTPUT_BUFFER, &abs));
                 break;
         }
-        (*stats)[computation_dims.size() - 2]->types[types[i]]->nb_assignments++;
+//        (*stats)[computation_dims.size() - 2]->types[types[i]]->nb_assignments++;
     }
 
    /* for (int k = 0; (k < variables_stencils.size()) && st; ++k) {
         variables.push_back(variables_stencils[k]);
     }*/
 
-    for (int k = 0; (k < stencils_input_variables.size()) && st; ++k) {
-        variables.push_back(stencils_input_variables[k]);
+//    for (int k = 0; (k < stencils_input_variables.size()) && st; ++k) {
+//        variables.push_back(stencils_input_variables[k]);
+//    }
+
+//    for (int j = 0; j < shared_variables.size(); ++j) {
+//            all_vars.push_back(shared_variables[j]);
+//    }
+//    for (int k= 0 ; k<unshared_variables.size(); k++){
+//        for ( int j =0; j<unshared_variables[k].size(); j++){
+//            all_vars.push_back(unshared_variables[k][j]);
+//            all_vars.push_back(unshared_variables_stencils[k][j]);
+//        }
+//    }
+
+// parcourir toutes les var utilisé uniquement pour les ajouter a all vars
+
+
+    for (int j = 0; j < inputs.size(); ++j) {
+        for (int k = 0; k< inputs[j]->variables.size(); k++){
+            if (!(contains(all_vars, inputs[j]->variables[k]))){
+                all_vars.push_back(inputs[j]->variables[k]);
+            }
+        }
+
     }
 
-    for (int j = 0; j < variables.size(); ++j) {
-            all_vars.push_back(variables[j]);
+    for (int j = 0; j < computations.size(); ++j) {
+        for (int k = 0; k< computations[j]->variables.size(); k++){
+            if (!(contains(all_vars, computations[j]->variables[k]))){
+                all_vars.push_back(computations[j]->variables[k]);
+            }
+        }
+
     }
+
 
     vector<schedule *> schedules;
 
@@ -262,18 +460,39 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
     if (all_schedules) {
         //generate_all_schedules(schedules_parameters, computations[0], &schedules_exhaustive, &variables_exhaustive,
         //                       &schedule_classes);
-        generate_all_schedules_multiple_adj_comps(schedules_parameters, computations, &schedules_exhaustive, &variables_exhaustive,
-                                &schedule_classes);
+//        generate_all_schedules_multiple_adj_comps(schedules_parameters, computations, &schedules_exhaustive, &variables_exhaustive,
+//                                &schedule_classes);
+        generate_all_schedules_shared_vars(schedules_parameters, computations, &schedules_exhaustive, &variables_exhaustive,
+                                &schedule_classes, shared_variables);
     }
     else {
        // generate_random_schedules(nb_rand_schedules, schedules_parameters, computations[0], &schedules_exhaustive,
           //                        &variables_exhaustive, &schedule_classes);
+          //TODO gen schedules not implemented for the general case
         generate_random_schedules_multiple_adj_comps(nb_rand_schedules, schedules_parameters, computations, &schedules_exhaustive,
                                                      &variables_exhaustive, &schedule_classes);
     }
 
 
     tiramisu_code *code;
+
+    vector<constant *> variable_max_values;
+//    variable_max_values.insert(variable_max_values.end(), shared_variable_max_values.begin(), shared_variable_max_values.end());
+////    variable_max_values.insert(variable_max_values.end(), shared_variable_max_values_stencils.begin(), shared_variable_max_values_stencils.end());
+//
+//    for (int i = 0; i<unshared_variable_max_values.size(); i++){
+//        variable_max_values.insert(variable_max_values.end(), unshared_variable_max_values[i].begin(), unshared_variable_max_values[i].end());
+////        variable_max_values.insert(variable_max_values.end(), unshared_variable_max_values_stencils[i].begin(), unshared_variable_max_values_stencils[i].end());
+//    }
+
+
+    for (int j = 0; j < all_vars.size(); ++j) {
+        if (!(contains(variable_max_values, all_vars[j]->sup_value))){
+            variable_max_values.push_back(all_vars[j]->sup_value);
+        }
+    }
+
+
 
     for (int i = 0; i < variables_exhaustive.size(); ++i) {
         all_schedule_variables = all_vars;
@@ -863,13 +1082,14 @@ void generate_all_schedules(vector<schedule_params> schedules, computation *comp
     }
 }
 
-void generate_all_schedules_multiple_adj_comps(vector<schedule_params> schedules, vector<computation*> comps, vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes){
+void generate_all_schedules_multiple_adj_comps(vector<schedule_params> schedules, vector<computation*> comps,
+        vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables, vector<schedules_class*> *schedule_classes){
     deque<state*> q;
     state *current_state;
     int current_level = 0, cpt = 0;
     vector<vector<schedule*>> schedules_exhaustive;
-    vector<configuration> stage_configurations = generate_configurations(schedules[current_level].schedule, schedules[current_level].factors, comps[0]->variables, comps[0]->type),
-            passed_configurations;
+    vector<configuration> stage_configurations = generate_configurations(schedules[current_level].schedule,
+            schedules[current_level].factors, comps[0]->variables, comps[0]->type),passed_configurations;
     for (int i = 0; i < stage_configurations.size(); i++){
         q.insert(q.begin() + i, new state({stage_configurations[i]}, current_level));
     }
@@ -879,7 +1099,43 @@ void generate_all_schedules_multiple_adj_comps(vector<schedule_params> schedules
         if (current_state->is_extendable(schedules.size())){
             passed_configurations = current_state->schedules;
             current_level = current_state->level + 1;
-            stage_configurations = generate_configurations(schedules[current_level].schedule, schedules[current_level].factors, current_state->schedules.back().out_variables, comps[0]->type);
+            stage_configurations = generate_configurations(schedules[current_level].schedule, schedules[current_level].factors,
+                    current_state->schedules.back().out_variables, comps[0]->type);
+            for (int i = 0; i < stage_configurations.size(); i++){
+                passed_configurations.push_back(stage_configurations[i]);
+                q.insert(q.begin() + i, new state(passed_configurations, current_level));
+                passed_configurations.pop_back();
+            }
+        }
+        if (current_state->is_appliable(schedules.size())){
+            (*generated_schedules).push_back(current_state->apply(comps));
+            (*generated_variables).push_back(current_state->schedules.back().out_variables);
+            (*schedule_classes).push_back(confs_to_sc(current_state->schedules));
+            cpt++;
+        }
+    }
+}
+
+void generate_all_schedules_shared_vars(vector<schedule_params> schedules, vector<computation*> comps,
+                                               vector<vector <schedule*>> *generated_schedules, vector<vector<variable*>> *generated_variables,
+                                               vector<schedules_class*> *schedule_classes, vector<variable *> variables){
+    deque<state*> q;
+    state *current_state;
+    int current_level = 0, cpt = 0;
+    vector<vector<schedule*>> schedules_exhaustive;
+    vector<configuration> stage_configurations = generate_configurations(schedules[current_level].schedule,
+                                                                         schedules[current_level].factors, variables, comps[0]->type),passed_configurations;
+    for (int i = 0; i < stage_configurations.size(); i++){
+        q.insert(q.begin() + i, new state({stage_configurations[i]}, current_level));
+    }
+    while (!q.empty()){
+        current_state = q.front();
+        q.pop_front();
+        if (current_state->is_extendable(schedules.size())){
+            passed_configurations = current_state->schedules;
+            current_level = current_state->level + 1;
+            stage_configurations = generate_configurations(schedules[current_level].schedule, schedules[current_level].factors,
+                                                           current_state->schedules.back().out_variables, comps[0]->type);
             for (int i = 0; i < stage_configurations.size(); i++){
                 passed_configurations.push_back(stage_configurations[i]);
                 q.insert(q.begin() + i, new state(passed_configurations, current_level));

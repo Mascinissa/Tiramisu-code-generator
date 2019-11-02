@@ -985,6 +985,15 @@ bool contains(vector<variable *> v, variable *e) {
     return false;
 }
 
+bool contains(vector<constant *> v, constant *e) {
+    for (int i = 0; i < v.size(); i++) {
+        if ((v[i]->name == e->name)|| (v[i]->name == e->name.substr(0, e->name.find(" "))))
+            return true;
+
+    }
+    return false;
+}
+
 int find_schedule(vector<configuration> schedules, int schedule){
     for (int i = 0; i < schedules.size(); ++i) {
         if (schedules[i].schedule == schedule) return i;
@@ -1007,6 +1016,7 @@ map<int, vector<int>> indexes_by_size(
             vector<int> indexes_same_size = {i};
             indexes.push_back(indexes_same_size);
         }
+
     }
 
     map<int, vector<int>> indexes_map;

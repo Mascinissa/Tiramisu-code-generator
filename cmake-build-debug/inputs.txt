@@ -1,4 +1,4 @@
-nb_codes : "100"
+nb_codes : "50"
 max_nb_stages (max number of computations) : "10"
 default_type_tiramisu : "p_int32"
 default_type_warpper : "int32_t"

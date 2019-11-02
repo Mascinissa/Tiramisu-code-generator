@@ -18,7 +18,7 @@
 #define STENCIL 2
 #define TILE_2_PROB 0.5
 #define MAX_STENCIL_SIZE 3
-#define SHUFFLE_SAME_SIZE_PROB 0.1
+#define SHUFFLE_SAME_SIZE_PROB 0.5
 
 
 //=======================================define random_generator
@@ -362,6 +362,7 @@ int find(vector<int> ints, int e);
 int find_schedule(vector<configuration> schedules, int schedule);
 
 bool contains(vector<variable*> v, variable *e);
+bool contains(vector<constant *> v, constant *e);
 map <int, vector<int>> indexes_by_size(vector<variable*> vars);
 
 vector<int> new_indexes(vector<vector<int>> indexes_by_size, int size);

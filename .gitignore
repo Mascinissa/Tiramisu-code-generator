@@ -1,2 +1,3 @@
 cmake-build-debug/samples
+cmake-build-debug/samples*
 .idea
