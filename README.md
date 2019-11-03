@@ -2,9 +2,8 @@
 
 *Forked form https://github.com/IsraMekki/tiramisu_code_generator *
 
-Generates random Tiramisu codes. The program currently generates two types of codes :
-* Sequence of computations in the innermost loop which can be : simple assignments, assignments with other computations or stencils.
-* Sequence of convolution layers. With two types of padding : same padding (adding 0 padding so that the input and the output layers have the same height and width), and valid padding (no padding).
+Generates random Tiramisu codes. This version generates :
+* codes with multiple computations, computations are randomly assigned to loops, different loops can share the same parent loop and computations can share the same loop level with another loop, the constraint is that top level loop must be shared across all computations (there can only be one root loop), interchange and tililing are applied only to the shared loops and unrolling is applied against the innermost loop 
 
 # Running the generator
 ## Generator parameters
