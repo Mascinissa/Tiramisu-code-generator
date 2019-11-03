@@ -173,7 +173,8 @@ void schedule::write(string *code_buffer, int indentation_level) {
                 *code_buffer += comps[k]->name + ".interchange(" + this->vars_to_string(0, this->vars.size()) + ");";
                 break;
             case UNROLL:
-                *code_buffer += comps[k]->name + ".unroll(" + vars[0]->name + ", " + to_string(factors[0]) + ");";
+                *code_buffer += comps[k]->name + ".unroll(" + comps[k]->variables.back()->name + ", " + to_string(factors[0]) + ");";
+//                *code_buffer += comps[k]->name + ".unroll(" + vars[0]->name + ", " + to_string(factors[0]) + ");";
                 break;
             case TILE_2:
                 *code_buffer +=
@@ -430,6 +431,7 @@ tiramisu_code::tiramisu_code(int code_id, string function_name, vector<computati
     write_variables();
     write_inputs();
     write_computations();
+    write_comps_order();
     write_schedules();
     write_buffers();
     generate_code();
@@ -437,6 +439,8 @@ tiramisu_code::tiramisu_code(int code_id, string function_name, vector<computati
 
 
 }
+
+
 
 void tiramisu_code::write_variables() {
     if (!variables.empty()) {
@@ -821,6 +825,39 @@ void tiramisu_code::write_schedules() {
 
 }
 
+void tiramisu_code::write_comps_order() {
+
+    new_line(1, indentation_level, &code_buffer);
+    for (int i = 0; i< computations.size() - 1; i++){
+        int k = 0;
+        while ((computations[i]->variables[k]->id == computations[i+1]->variables[k]->id)){
+            k++;
+            if ((k == computations[i]->variables.size()) || (k == computations[i+1]->variables.size())) // all vars of one of the comps are contained in the other
+                break;
+        }
+        if (k > 0){
+            new_line(1, indentation_level, &code_buffer);
+            code_buffer += computations[i]->name;
+            code_buffer += ".then(" + computations[i+1]->name + ", " + computations[i]->variables[k-1]->name +")";
+            code_buffer += ";";
+        }
+
+    }
+
+    new_line(1, indentation_level, &code_buffer);
+    for (int i = 0; i< computations.size(); i++){
+        for (int j = i+1; j< computations.size(); j++){
+            if (computations[i]->variables.back()->id == computations[j]->variables.back()->id){
+                new_line(1, indentation_level, &code_buffer);
+                code_buffer += computations[i]->name;
+                code_buffer += ".then(" + computations[j]->name + ", " + computations[i]->variables.back()->name +")";
+                code_buffer += ";";
+                break; //skip the rest of comp[j]
+            }
+        }
+    }
+
+}
 
 //=====================================================================variable class==========================================================================================================
 variable::variable(string name, int id, int inf_value, constant *sup_value) {

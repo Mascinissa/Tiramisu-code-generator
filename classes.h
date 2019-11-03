@@ -51,7 +51,7 @@
 
 #define INF (-100)
 
-#define CODES_FROM 1001
+#define CODES_FROM 11001
 //BATCH_SIZE is only used for naming the folders, to change the real batch size edit input.txt
 #define BATCH_SIZE 100
 #define BATCH_NAME "batch"+to_string(CODES_FROM)+"-"+to_string(CODES_FROM+BATCH_SIZE-1)
@@ -169,6 +169,7 @@ private:
 //=====================================================================tiramisu_code class==========================================================================================================
 class tiramisu_code{
 private:
+    void write_comps_order();
     void write_variables();
     void write_constants();
     void write_computations();

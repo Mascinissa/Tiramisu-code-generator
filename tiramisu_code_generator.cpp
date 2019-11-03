@@ -19,7 +19,7 @@ vector<variable *> generate_variables(int nb_variables, int name_from, int *inf_
 vector<variable *> generate_variables(int nb_variables, int name_from, vector<int> inf_values, vector<constant *> constants, int vects_from) {
     vector<variable *> variables;
     for (int i = vects_from; i < nb_variables + vects_from; ++i) {
-        variables.push_back(new variable("i" + to_string(i + name_from - vects_from), i + name_from, inf_values[i], constants[i]));
+        variables.push_back(new variable("i" + to_string(i + name_from - vects_from), i + name_from - vects_from, inf_values[i], constants[i]));
     }
     return variables;
 }
@@ -268,8 +268,8 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
         variables.clear();
         variables_stencils.clear();
         computation_dims.clear();
-        computation_dims.insert(computation_dims.begin(), computation_shared_dims.begin(), computation_shared_dims.end());
-        computation_dims.insert(computation_dims.begin(), computation_unshared_dims[comp_variables_choice].begin(), computation_unshared_dims[comp_variables_choice].end());
+        computation_dims.insert(computation_dims.end(), computation_shared_dims.begin(), computation_shared_dims.end());
+        computation_dims.insert(computation_dims.end(), computation_unshared_dims[comp_variables_choice].begin(), computation_unshared_dims[comp_variables_choice].end());
 
 
         inp = rand() % nb_inputs + 1;
@@ -375,8 +375,6 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
                             new buffer("buf" + to_string(i) + "0", computation_dims, INPUT_BUFFER, &abs));
                     abs1.push_back(in);
                 }
-                if (code_id==1007)
-                    cout<< "1007";
                 stage_computation = generate_computation("comp" + to_string(i), variables_stencils, STENCIL, abs,
                                                          var_nums_copy, offset, *default_type_tiramisu, id++);
                 computations.push_back(stage_computation);
@@ -469,6 +467,7 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
        // generate_random_schedules(nb_rand_schedules, schedules_parameters, computations[0], &schedules_exhaustive,
           //                        &variables_exhaustive, &schedule_classes);
           //TODO gen schedules not implemented for the general case
+        cout << " generating random schedules is not yet well supported, check the results before using" << endl;
         generate_random_schedules_multiple_adj_comps(nb_rand_schedules, schedules_parameters, computations, &schedules_exhaustive,
                                                      &variables_exhaustive, &schedule_classes);
     }
@@ -616,7 +615,7 @@ node_class *comps_to_node(vector<computation*> comps, int seed) {
 
     for (int i=0; i<comps.size(); i++){
         for( int j=0 ; j< comps[i]->variables.size(); j++){
-
+            // find() == vector.end() means it was not found
             if(find(comps_iterators_ids_array.begin(), comps_iterators_ids_array.end(), comps[i]->variables[j]->id) == comps_iterators_ids_array.end()){
                 comps_iterators_ids_array.push_back(comps[i]->variables[j]->id);
                 comps_iterators_array.push_back(new iterator_class(comps[i]->variables[j]->id, comps[i]->variables[j]->inf_value,
@@ -726,22 +725,53 @@ node_class *comps_to_node(vector<computation*> comps, int seed) {
     computations_class *computations = new computations_class(computation.size(), computation);
 
     //assignment_class *assignment = new assignment_class(comps[0]->id, 0);
-    vector<assignment_class*> assignment;
-    for (int i=0; i<comps.size();i++){
-        assignment.push_back(new assignment_class(comps[i]->id, i));
-    }
 
-    assignments_class *assignments = new assignments_class(comps.size(), assignment);
+//    vector<assignment_class*> assignment;
+//    for (int i=0; i<comps.size();i++){
+//        assignment.push_back(new assignment_class(comps[i]->id, i));
+//    }
+//
+//    assignments_class *assignments = new assignments_class(comps.size(), assignment);
 
 
     vector<loop_class *> loops_array;
-    for (int i = 0; i < comps[0]->variables.size(); ++i) {
-        loops_array.push_back(new loop_class(i, i - 1, 0, comps[0]->variables[i]->id, new assignments_class(0, {})));
-        //loops_array.push_back(new loop_class(i, i - 1, 0, iterators_array[i]->id, new assignments_class(0, {})));
-    }
-    loops_array[comps[0]->variables.size() - 1]->assignments = assignments;
+    vector<int> loops_array_ids;
+    vector<int> loops_count_per_level;
+    vector<assignment_class *> assign_place_holder;
 
-    loops_class *loops = new loops_class(comps[0]->variables.size(), loops_array);
+    for (int i=0; i<comps.size(); i++) {
+        for (int j = 0; j < comps[i]->variables.size(); j++) {
+            if (loops_count_per_level.size()< j +1)
+                loops_count_per_level.push_back(0);
+
+            if (find(loops_array_ids.begin(), loops_array_ids.end(), comps[i]->variables[j]->id) == loops_array_ids.end()) {
+                loops_array_ids.push_back(comps[i]->variables[j]->id);
+                int parent_id = -1;
+                if (j>0) //if not the first loop
+                    parent_id = comps[i]->variables[j-1]->id;
+                //for now, as loop position I'm using the absolute position per loop depth level
+                loops_array.push_back(new loop_class(comps[i]->variables[j]->id, parent_id, loops_count_per_level[j], comps[i]->variables[j]->id, new assignments_class(0, assign_place_holder)));
+                loops_count_per_level[j]++;
+
+            }
+            if (j == (comps[i]->variables.size()-1)) { // if it is the last iterator of a computation, add the computation to the assignments array
+                loop_class * parent_loop= loops_array[distance(loops_array_ids.begin(), find(loops_array_ids.begin(), loops_array_ids.end(), comps[i]->variables[j]->id))];
+                parent_loop->assignments->assignments.push_back(new assignment_class(comps[i]->id, parent_loop->assignments->assignments.size() ));
+                parent_loop->assignments->n++;
+            }
+        }
+    }
+
+
+//    for (int i = 0; i < comps[0]->variables.size(); ++i) {
+//        loops_array.push_back(new loop_class(i, i - 1, 0, comps[0]->variables[i]->id, new assignments_class(0, {})));
+//        //loops_array.push_back(new loop_class(i, i - 1, 0, iterators_array[i]->id, new assignments_class(0, {})));
+//    }
+
+//    loops_array[comps[0]->variables.size() - 1]->assignments = assignments;
+
+//    loops_class *loops = new loops_class(comps[0]->variables.size(), loops_array);
+    loops_class *loops = new loops_class(loops_array.size(), loops_array);
 
     node_class *node = new node_class(seed, loops, computations, iterators, all_inputs);
 
