@@ -53,7 +53,7 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
     offset = rand() % offset + 1;
 
     //max_nb_dims from input.txt (number of nested loops)
-    int id = 0, nb, nb_shared_dims = (rand() % (max_nb_dims - 2)) + 2 , sum = 0, const_sum = MAX_MEMORY_SIZE - nb_shared_dims * MIN_LOOP_DIM;
+    int id = 0, nb, nb_shared_dims = ((rand() % (max_nb_dims - 2))/2 + 2) , sum = 0, const_sum = MAX_MEMORY_SIZE - nb_shared_dims * MIN_LOOP_DIM;
 //    int id = 0, nb, nb_dims = max_nb_dims, sum = 0, const_sum = MAX_MEMORY_SIZE - nb_dims * MIN_LOOP_DIM;
 
     vector<int> computation_shared_dims;
@@ -160,6 +160,8 @@ void generate_tiramisu_code_multiple_computations(int code_id, int nb_stages, do
             unshared_variables_stencils.push_back(vector<variable *> (unshared_variables_stencils[reused_branch].begin(), unshared_variables_stencils[reused_branch].begin() + reused_depth));
 
             nb_new_dims = (rand() % (max_nb_dims - nb_shared_dims + 1 - reused_depth))  ;
+//             nb_new_dims = 0  ; // for reusing previous branches without creating new iterators
+
         } else {
             nb_new_dims = (rand() % (max_nb_dims - nb_shared_dims + 1)) ;
             if (nb_new_dims==0) nb_new_dims=1; // this is because the code doesn't yet support stencils on shared iterator, so there must always be at least one unshared dim, remove this line once it supports that

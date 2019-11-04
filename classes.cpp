@@ -825,37 +825,133 @@ void tiramisu_code::write_schedules() {
 
 }
 
+bool cmp_by_vars(const computation* comp1, const computation* comp2){
+    int k=0;
+    while ((k<comp1->variables.size()) && (k<comp2->variables.size())){
+        if (comp1->variables[k]->name < comp2->variables[k]->name)
+            return false;
+        if (comp1->variables[k]->name > comp2->variables[k]->name)
+            return true;
+        k++;
+    }
+
+    if (comp1->variables.size()<comp2->variables.size())
+        return false;
+    if (comp1->variables.size()>comp2->variables.size())
+        return true;
+
+    return false;
+}
 void tiramisu_code::write_comps_order() {
 
-    new_line(1, indentation_level, &code_buffer);
-    for (int i = 0; i< computations.size() - 1; i++){
-        int k = 0;
-        while ((computations[i]->variables[k]->id == computations[i+1]->variables[k]->id)){
-            k++;
-            if ((k == computations[i]->variables.size()) || (k == computations[i+1]->variables.size())) // all vars of one of the comps are contained in the other
+//    new_line(1, indentation_level, &code_buffer);
+//    for (int i = 0; i< computations.size() - 1; i++){
+//        int k = 0;
+//        while ((computations[i]->variables[k]->id == computations[i+1]->variables[k]->id)){
+//            k++;
+//            if ((k == computations[i]->variables.size()) || (k == computations[i+1]->variables.size())) // all vars of one of the comps are contained in the other
+//                break;
+//        }
+//        if (k > 0){
+//            new_line(1, indentation_level, &code_buffer);
+//            code_buffer += computations[i]->name;
+//            code_buffer += ".then(" + computations[i+1]->name + ", " + computations[i]->variables[k-1]->name +")";
+//            code_buffer += ";";
+//        }
+//
+//    }
+
+
+
+//    vector <bool> has_predecessor = vector<bool> (computations.size(), 0) ;
+//    new_line(1, indentation_level, &code_buffer);
+//    for (int i = 0; i< computations.size(); i++){
+//        for (int j = i+1; j< computations.size(); j++){
+//            if (computations[i]->variables.back()->id == computations[j]->variables.back()->id){
+//                new_line(1, indentation_level, &code_buffer);
+//                code_buffer += computations[i]->name;
+//                code_buffer += ".then(" + computations[j]->name + ", " + computations[i]->variables.back()->name +")";
+//                code_buffer += ";";
+//                has_predecessor[j]=true;
+//                break; //skip the rest of comp[j]
+//            }
+//        }
+//    }
+//
+////    new_line(1, indentation_level, &code_buffer);
+//    for (int i = 0; i< computations.size() - 1; i++){
+//        int k = 0;
+//        if (has_predecessor[i+1])
+//            continue;
+//        while ((computations[i]->variables[k]->id == computations[i+1]->variables[k]->id)){
+//            k++;
+//            if ((k == computations[i]->variables.size()) || (k == computations[i+1]->variables.size())) // all vars of one of the comps are contained in the other
+//                break;
+//        }
+//        if (k > 0){
+//            new_line(1, indentation_level, &code_buffer);
+//            code_buffer += computations[i]->name;
+//            code_buffer += ".then(" + computations[i+1]->name + ", " + computations[i]->variables[k-1]->name +")";
+//            code_buffer += ";";
+//        }
+//
+//    }
+
+
+
+    vector <vector<computation*>> fused_innermost ;
+    vector <computation*> sorted_computations (computations.size());
+    partial_sort_copy(computations.begin(),computations.end(),sorted_computations.begin(),sorted_computations.end(),cmp_by_vars);
+//    if (id==11003)
+//        cout<<id;
+
+//    vector <bool> has_successor = vector<bool> (computations.size(), false);
+    vector <bool> has_predecessor = vector<bool> (sorted_computations.size(), false) ;
+
+
+    fused_innermost.push_back({sorted_computations[0]});
+
+    for (int i = 1; i< sorted_computations.size(); i++){
+        for (int j = 0; j< fused_innermost.size(); j++){
+            if (sorted_computations[i]->variables.back()->id == fused_innermost[j].back()->variables.back()->id){
+                fused_innermost[j].push_back(sorted_computations[i]);
+                has_predecessor[i]=true;
                 break;
-        }
-        if (k > 0){
-            new_line(1, indentation_level, &code_buffer);
-            code_buffer += computations[i]->name;
-            code_buffer += ".then(" + computations[i+1]->name + ", " + computations[i]->variables[k-1]->name +")";
-            code_buffer += ";";
-        }
-
-    }
-
-    new_line(1, indentation_level, &code_buffer);
-    for (int i = 0; i< computations.size(); i++){
-        for (int j = i+1; j< computations.size(); j++){
-            if (computations[i]->variables.back()->id == computations[j]->variables.back()->id){
-                new_line(1, indentation_level, &code_buffer);
-                code_buffer += computations[i]->name;
-                code_buffer += ".then(" + computations[j]->name + ", " + computations[i]->variables.back()->name +")";
-                code_buffer += ";";
-                break; //skip the rest of comp[j]
             }
         }
+        if (!has_predecessor[i])
+            fused_innermost.push_back({sorted_computations[i]});
     }
+
+    new_line(2, indentation_level, &code_buffer);
+    code_buffer += sorted_computations[0]->name;
+    for (int i = 0; i < fused_innermost.size(); i++){
+        for (int j = 1; j < fused_innermost[i].size(); ++j) {
+//            if ((i==0)&&(j==0))
+//                continue;
+            if (!((i==0)&&(j==1))){
+                new_line(1, indentation_level+1, &code_buffer);
+            }
+            code_buffer += ".then(" + fused_innermost[i][j]->name + ", " + fused_innermost[i][j]->variables.back()->name +")";
+
+        }
+        if (i<fused_innermost.size()-1){
+            int k = 0;
+            while (fused_innermost[i].back()->variables[k]->id == fused_innermost[i+1][0]->variables[k]->id){
+                k++;
+                if ((k == fused_innermost[i].back()->variables.size()) || (k == fused_innermost[i+1][0]->variables.size())) // all vars of one of the comps are contained in the other
+                    break;
+            }
+            new_line(1, indentation_level+1, &code_buffer);
+            code_buffer += ".then(" + fused_innermost[i+1][0]->name + ", " + fused_innermost[i].back()->variables[k-1]->name +")";
+        }
+
+//        if (!((i==fused_innermost.size()-1)&&(fused_innermost[i+1].size()>=2))){
+//
+//        }
+
+    }
+    code_buffer += ";";
 
 }
 

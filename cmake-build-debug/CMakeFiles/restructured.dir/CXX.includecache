@@ -6,20 +6,6 @@
 
 #IncludeRegexTransform: 
 
-/home/masci/Tiramisu-code-generator/classes.cpp
-cmath
--
-sys/stat.h
--
-classes.h
-/home/masci/Tiramisu-code-generator/classes.h
-external_writers.h
-/home/masci/Tiramisu-code-generator/external_writers.h
-algorithm
--
-string
--
-
 /home/masci/Tiramisu-code-generator/classes.h
 string
 -
@@ -43,4 +29,34 @@ fstream
 -
 classes.h
 /home/masci/Tiramisu-code-generator/classes.h
+
+/home/masci/Tiramisu-code-generator/tiramisu_code_generator.cpp
+random
+-
+algorithm
+-
+tiramisu_code_generator.h
+/home/masci/Tiramisu-code-generator/tiramisu_code_generator.h
+
+/home/masci/Tiramisu-code-generator/tiramisu_code_generator.h
+string
+-
+vector
+-
+iostream
+-
+fstream
+-
+time.h
+-
+sys/stat.h
+-
+cmath
+-
+map
+-
+classes.h
+/home/masci/Tiramisu-code-generator/classes.h
+external_writers.h
+/home/masci/Tiramisu-code-generator/external_writers.h
 
